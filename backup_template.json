@@ -1,0 +1,38 @@
+{
+  "chat_history": [
+    {
+      "id": "msg_001",
+      "sender": "me",
+      "timestamp": 1718300000000,
+      "text": "這是還原回來的測試訊息第一條"
+    },
+    {
+      "id": "msg_002",
+      "sender": "partner",
+      "timestamp": 1718300050000,
+      "text": "看到這段字代表本地 localForage 還原成功！"
+    }
+  ],
+  "diary_records": [
+    {
+      "id": "diary_2026_06_13",
+      "date": "2026-06-13",
+      "title": "GitHub 部署日誌",
+      "content": "成功將 HTML 與 JSON 拆分並修正了備份模組的導入缺陷。"
+    }
+  ],
+  "accounting_data": {
+    "currency": "TWD",
+    "total_income": 50000,
+    "total_expense": 12500,
+    "list": [
+      {"item": "午餐", "amount": 120, "type": "expense"},
+      {"item": "專案獎金", "amount": 5000, "type": "income"}
+    ]
+  },
+  "config_theme": {
+    "current_mode": "dark",
+    "color_palette": "black-white",
+    "font_size": "medium"
+  }
+}
