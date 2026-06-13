@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數據備份控制台</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f7;
+            --text-main: #1d1d1f;
+            --text-sub: #86868b;
+            --border: #e5e5ea;
+            --accent: #0071e3;
+        }
+        [data-theme="dark"] {
+            --bg-primary: #1c1c1e;
+            --bg-secondary: #000000;
+            --text-main: #f5f5f7;
+            --text-sub: #8e8e93;
+            --border: #3a3a3c;
+            --accent: #2997ff;
+        }
+        body {
+            margin: 0;
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .card {
+            width: 100%;
+            max-width: 440px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            box-sizing: border-box;
+        }
+        h2 { margin: 0 0 20px 0; font-size: 1.25rem; display: flex; align-items: center; gap: 10px; }
+        .info-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .info-row:last-child { margin-bottom: 0; }
+        .btn-group { display: flex; flex-direction: column; gap: 12px; }
+        .btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 12px; border-radius: 12px; font-size: 0.95rem; font-weight: 600;
+            cursor: pointer; border: none; width: 100%; box-sizing: border-box;
+            transition: opacity 0.2s;
+        }
+        .btn-download { background: var(--accent); color: white; }
+        .btn-upload { background: var(--bg-secondary); color: var(--text-main); border: 1px solid var(--border); }
+        .btn:hover { opacity: 0.9; }
+        #file-input { display: none; }
+        .toast {
+            position: fixed; bottom: 20px; background: rgba(0,0,0,0.8); color: white;
+            padding: 10px 20px; border-radius: 20px; font-size: 0.85rem;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2><i class="fas fa-database"></i> 系統數據備份端</h2>
+    
+    <div class="info-box">
+        <div class="info-row"><span style="color:var(--text-sub)">儲存庫名稱：</span><strong>ZmilkChatData</strong></div>
+        <div class="info-row"><span style="color:var(--text-sub)">當前狀態：</span><span id="db-status">檢測中...</span></div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn btn-download" onclick="exportToZIP()">
+            <i class="fas fa-file-download"></i> 打包並下載全部數據 (.zip)
+        </button>
+
+        <label class="btn btn-upload">
+            <input type="file" id="file-input" accept=".zip,.json" onchange="importBackup(event)">
+            <i class="fas fa-file-upload"></i> 上傳並覆蓋還原數據
+        </label>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+    // 綁定本地快取庫 (請確保與你專案的 config.js 命名一致)
+    const store = localforage.createInstance({
+        name: "ZmilkChatData",
+        storeName: "app_core_state"
+    });
+
+    async function checkDB() {
+        try {
+            const keys = await store.keys();
+            document.getElementById('db-status').innerText = `已連接 (${keys.length} 項快取)`;
+        } catch(e) {
+            document.getElementById('db-status').innerText = '連接失敗';
+        }
+    }
+    checkDB();
+
+    function showMsg(text) {
+        const t = document.getElementById('toast');
+        t.innerText = text; t.style.opacity = '1';
+        setTimeout(() => t.style.opacity = '0', 2500);
+    }
+
+    // 功能 A：下載 (將 localforage 所有 Key 打包成 ZIP)
+    async function exportToZIP() {
+        try {
+            const keys = await store.keys();
+            if (keys.length === 0) {
+                showMsg("本地無任何快取數據可供下載！");
+                return;
+            }
+
+            const zip = new JSZip();
+            for (const key of keys) {
+                const value = await store.getItem(key);
+                zip.file(`${key}.json`, JSON.stringify(value, null, 2));
+            }
+
+            const blob = await zip.generateAsync({type: "blob"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `archive_backup_${Date.now()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showMsg("備份下載成功！");
+        } catch(err) {
+            showMsg("下載失敗: " + err.message);
+        }
+    }
+
+    // 功能 B：上傳還原
+    async function importBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            // 如果上傳的是 ZIP 包
+            if (file.name.endsWith('.zip')) {
+                const zip = await JSZip.loadAsync(file);
+                for (const [filename, fileObj] of Object.entries(zip.files)) {
+                    if (fileObj.dir) continue;
+                    const content = await fileObj.async("text");
+                    const key = filename.replace('.json', '');
+                    await store.setItem(key, JSON.parse(content));
+                }
+                showMsg("ZIP 數據恢復完成！");
+            } 
+            // 如果上傳的是單一 JSON 檔案
+            else if (file.name.endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const data = JSON.parse(e.target.result);
+                    // 批次寫入 JSON 中的所有主鍵
+                    for (const [key, val] of Object.entries(data)) {
+                        await store.setItem(key, val);
+                    }
+                    showMsg("JSON 數據恢復完成！");
+                    checkDB();
+                };
+                reader.readAsText(file);
+            }
+            setTimeout(checkDB, 500);
+        } catch(err) {
+            showMsg("解析或寫入失敗，請檢查檔案格式");
+        } finally {
+            event.target.value = ''; // 清空選擇器
+        }
+    }
+</script>
+</body>
+</html>
